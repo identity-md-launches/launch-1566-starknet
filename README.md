@@ -2,6 +2,56 @@
 
 A custom token for an IdentityMD custom-token launch on Ethereum mainnet (chain id 1).
 
+## Website
+
+`web/` holds a single-page Vite + React + TypeScript site for the live token, and `dist/` is its
+committed production export. The page reads the token and its Uniswap v4 pool over public RPCs
+(supply, pool price in IMD, pool holdings, the launch remainder balance), lets anyone check a
+balance by address, and lets a visitor connect a browser wallet (EIP-1193) to see their balance,
+send STARKNET and add the token to their wallet. All addresses come from the launch's
+`deployment.json` and `network.json` and live in `web/src/config.ts`; the ABI in `web/src/abi.ts`
+is the `forge build` output of `src/StarknetToken.sol` (its sorted-key keccak matches the
+deployment's `abiHash`). Design tokens and components are documented in `DESIGN.md`; the
+validation record is `artifacts/validation.md`.
+
+### Install, preview, rebuild
+
+```
+cd web
+npm ci                 # Node 24 and npm 11 were used; installs from package-lock.json
+npm run dev            # Vite dev server with hot reload
+npm run build          # production export to ../dist (base ./, relative asset URLs)
+npm run preview        # serves the built ../dist locally
+npm run typecheck      # tsc --noEmit
+npm run check          # static checks on ../dist: relative URLs, files present, share tags
+```
+
+`dist/` is served as committed; the publisher does not rebuild. Rebuild after any source change
+and commit `dist/` with it. `node_modules/` is not committed.
+
+Share images (`web/public/og.png`, `web/public/apple-touch-icon.png`) are rendered from inline
+HTML by `node scripts/make-images.mjs`, which needs Playwright either installed as a package or
+named through `IMD_PLAYWRIGHT=<path to playwright/index.mjs>`.
+
+### Checks that were run
+
+From the final source, on Linux with Node 24.21.0:
+
+| Check | Result |
+| --- | --- |
+| `npm run typecheck` | exit 0 |
+| `npm run build` | exit 0; 452 kB JS (140 kB gzip), 7 kB CSS |
+| `npm run check` | all pass |
+| Design probe `node .imd/reads/skills/design-critic/scripts/taste.mjs` at 320, 390 and 1440 | 16/16 checks pass |
+| `IMD_PLAYWRIGHT=… node web/scripts/interact.mjs dist` (headless Chromium, 390 and 1440) | 28/28 pass: live reads, balance lookup, validation and focus, keyboard order, connect, wrong network, transfer validation, cancelled signature, pending state, add to wallet |
+
+The interaction script starts its own static server for the run and injects a mocked wallet
+provider; reads go to the real public RPC. Limitations: no real transaction was sent (no wallet or
+funds on the worker); WebKit could not launch on the host, so Safari was not checked; no screen
+reader, forced-colors, zoom or physical-device checks. Details in `artifacts/validation.md`.
+
+## Token
+
 | Field | Value |
 | --- | --- |
 | Solidity contract | `StarknetToken` (`src/StarknetToken.sol`) |
